@@ -3,6 +3,7 @@
 
 from core.utils import common, config
 from core.server import core
+from core.server.commands import status
 
 def main():
     

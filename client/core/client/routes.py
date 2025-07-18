@@ -5,9 +5,9 @@ import time
 def auth(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        banner = tcp.recv_data(self.conn)
+        _,banner = tcp.recv_data(self.conn)
         self.insert_ansi(banner + "\n\n", False)
-        server_name = tcp.recv_data(self.conn)
+        _,server_name = tcp.recv_data(self.conn)
         parts = server_name.split(":")
         self.server_name = parts[1].strip()
         self.insert_ansi(server_name + "\n")
@@ -15,7 +15,7 @@ def auth(func):
         tcp.send_data(self.conn, self.username)
         tcp.send_data(self.conn, self.password)
         
-        msg = tcp.recv_data(self.conn)
+        _,msg = tcp.recv_data(self.conn)
 
         if msg != "Authentication Failed":
             return func(self, *args, **kwargs)
@@ -29,9 +29,14 @@ def auth(func):
 def handle(self):
     while True:
         time.sleep(1)
-        response = check_command(self)
+        header, response = check_command(self)
         if response:
             self.insert_ansi(response)
+        if header:
+            match header:
+                case "EXIT":
+                    time.sleep(1)
+                    self.on_close()
         
 
 def check_command(self):
@@ -40,8 +45,9 @@ def check_command(self):
         self.shared_cmd = None
     if cmd:
         return process_command(self.conn, cmd)
+    return None, None 
 
-def process_command(conn, cmd, header=None):
-    tcp.send_data(conn, cmd, header)
-    response = tcp.recv_data(conn)
-    return response
+def process_command(conn, cmd):
+    tcp.send_data(conn, cmd)
+    header, response = tcp.recv_data(conn)
+    return header, response

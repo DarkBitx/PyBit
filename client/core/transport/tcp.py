@@ -97,9 +97,8 @@ def recv_data(conn, binary=False):
     try:
         req = Request()
         req.set_conn(conn)
-        if req.recv(binary):
-            return (req.header + req.data).strip()
-        return None
+        req.recv(binary)
+        return req.header, req.data
     except Exception as e:
         print(f"[!] Error: {str(e)}")
         close(conn)

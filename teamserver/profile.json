@@ -14,9 +14,10 @@
       "log_file": "logs/teamserver.log",
       "log_level": "info"
     },
-    "beacon": {
+    "agent": {
       "max_connections": 100,
-      "timeout_seconds": 10,
+      "timeout_seconds": 30,
+      "seperator": "||",
       "heartbeat_interval": 5,
       "http_profile": {
         "tls": {
@@ -53,7 +54,7 @@
     },
     "encryption": {
       "enabled": true,
-      "method": "AES-GCM",
+      "method": "AES",
       "key": "REPLACE_WITH_256BIT_KEY"
     }
   }

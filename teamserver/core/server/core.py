@@ -1,5 +1,5 @@
 from core.utils.config import CONFIG
-from core.server import routes
+from core.server import handler
 from core.transport  import tcp
 import threading
 import socket
@@ -22,7 +22,7 @@ class Server:
 
 def handle_client(conn,addr):
     try:
-        routes.handle(conn,addr)
+        handler.handle(conn,addr)
     except Exception as e:
         tcp.send_data(conn, f"[!] Error: {str(e)}")
     finally:

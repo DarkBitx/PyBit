@@ -3,6 +3,7 @@ from colorama import init, Fore, Style
 from random import random, uniform
 from time import sleep
 from sys import stdout
+import random
 import json
 import os
 
@@ -26,7 +27,20 @@ def banner():
                \_|      {Fore.BLACK}v{CONFIG.version}{Style.RESET_ALL}
 """
     return (logo + "\n\n")
-    
+
+
+
+
+def new_id() -> str:
+    seed = random.randint(0, 10)
+    chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    id_parts = [
+        ''.join(random.choice(chars) for _ in range(5)),
+        ''.join(random.choice(chars) for _ in range(5))
+    ]
+    return f"{id_parts[0]}-{id_parts[1]}"
+
+
 def time_now_str() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 

@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 import time
-import sys
+import os
 import re
 
 # Mapping ANSI color codes to color tag names (must match your tag_config naming)
@@ -56,7 +56,7 @@ class LoginWindow:
         self.master = master
         master.title("PyBit C2 - Connector")
         master.configure(bg="#1e1e1e")
-        master.geometry("300x260")
+        self.set_geometry_centered(300, 260)
         master.resizable(False, False)
 
         # Title
@@ -93,7 +93,15 @@ class LoginWindow:
             TerminalWindow(ip, port, user, password)
         else:
             messagebox.showerror("Missing Info", "Please fill in all fields.")
+            
+    def set_geometry_centered(self, win_w, win_h):
+        screen_w = 1500
+        screen_h = 850
 
+        x = (screen_w - win_w) // 2
+        y = (screen_h - win_h) // 2
+
+        self.master.geometry(f"{win_w}x{win_h}+{x}+{y}")
 
 class TerminalWindow:
     def __init__(self, ip, port, username, password):
@@ -107,11 +115,10 @@ class TerminalWindow:
         self.lock = threading.Lock()
         self.shared_cmd = None
 
-        
         self.window = tk.Toplevel()
         self.window.title("PyBit C2 - Terminal")
         self.window.configure(bg="#000000")
-        self.window.geometry("700x500")
+        self.set_geometry_centered(700,500)
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)  # handle window close
         self.text = tk.Text(
             self.window, bg="#000000", fg="#ffffff",
@@ -134,24 +141,22 @@ class TerminalWindow:
 
         self.text.bind("<Return>", self.handle_enter)
         self.text.bind("<Key>", lambda e: self.scroll_to_end())
-        
+
         self.conn = set_conn(self.ip, self.port)
         core.handle_client(self)
 
-    def scroll_to_end(self):
-        self.text.see("end")
+    def set_geometry_centered(self, win_w, win_h):
+        screen_w = 1500
+        screen_h = 850
 
-    def insert_line(self, line, tag="white"):
-        """Insert plain line with optional ANSI color tag (default: white)."""
-        self.text.insert("end", line + "\n", tag)
-        self.scroll_to_end()
+        x = (screen_w - win_w) // 2
+        y = (screen_h - win_h) // 2
 
-    def insert_prompt(self):
-        self.text.insert("end", f"\n{self.username}@{self.server_name}# ", "32")
-        self.scroll_to_end()
-        
+        self.window.geometry(f"{win_w}x{win_h}+{x}+{y}")
+
     def handle_enter(self, event=None):
-        cmd = self.text.get("end-2l", "end-1c").strip().split(">")[-1].strip()
+        line = self.text.get("end-2l", "end-1c").strip()
+        cmd = line.split("#", 1)[-1].strip()
         self.text.insert("end", "\n")
         self.set_command(cmd)
         return "break"
@@ -160,8 +165,16 @@ class TerminalWindow:
         with self.lock:
             self.shared_cmd = cmd
 
+    def insert_line(self, line, tag="white"):
+        """Insert plain line with optional ANSI color tag (default: white)."""
+        self.text.insert("end", line + "\n", tag)
+        self.scroll_to_end()
+
+    def insert_prompt(self):
+        self.text.insert("end", f"{self.username}@{self.server_name}# ", "32")
+        self.scroll_to_end()
+
     def insert_ansi(self, text, insert_status=True):
-        import re
 
         # Regex to split the ANSI escape codes
         parts = re.split(r'(\x1b\[\d{1,2}m)', text)
@@ -184,9 +197,12 @@ class TerminalWindow:
         ansi_escape = re.compile(r'\x1b\[\d{1,2}m')
         return ansi_escape.sub('', text)
     
+    def scroll_to_end(self):
+        self.text.see("end")
+        
     def on_close(self):
         self.window.destroy()
-        sys.exit(0)
+        os._exit(0)
 
 
 def set_conn(ip,port):

@@ -36,9 +36,10 @@ class ProxyConfig:
     listen_port: int
 
 @dataclass
-class BeaconConfig:
+class AgentConfig:
     max_connections: int
-    timeout_seconds: int
+    timeout_seconds: float
+    seperator: str
     heartbeat_interval: int
     http_profile: HTTPProfile
     proxy: ProxyConfig
@@ -69,7 +70,7 @@ class TeamServerConfig:
     server_name: str
     auth: AuthConfig
     logging: LoggingConfig
-    beacon: BeaconConfig
+    agent: AgentConfig
     encryption: EncryptionConfig
 
 def from_dict(data: dict) -> TeamServerConfig:
@@ -80,16 +81,17 @@ def from_dict(data: dict) -> TeamServerConfig:
         server_name=data["server_name"],
         auth=AuthConfig(**data["auth"]),
         logging=LoggingConfig(**data["logging"]),
-        beacon=BeaconConfig(
-            max_connections=data["beacon"]["max_connections"],
-            timeout_seconds=data["beacon"]["timeout_seconds"],
-            heartbeat_interval=data["beacon"]["heartbeat_interval"],
+        agent=AgentConfig(
+            max_connections=data["agent"]["max_connections"],
+            timeout_seconds=data["agent"]["timeout_seconds"],
+            seperator=data["agent"]["seperator"],
+            heartbeat_interval=data["agent"]["heartbeat_interval"],
             http_profile=HTTPProfile(
-                tls=TLSConfig(**data["beacon"]["http_profile"]["tls"]),
-                get=HTTPGetProfile(**data["beacon"]["http_profile"]["get"]),
-                post=HTTPPostProfile(**data["beacon"]["http_profile"]["post"]),
+                tls=TLSConfig(**data["agent"]["http_profile"]["tls"]),
+                get=HTTPGetProfile(**data["agent"]["http_profile"]["get"]),
+                post=HTTPPostProfile(**data["agent"]["http_profile"]["post"]),
             ),
-            proxy=ProxyConfig(**data["beacon"]["proxy"]),
+            proxy=ProxyConfig(**data["agent"]["proxy"]),
         ),
         encryption=EncryptionConfig(**data["encryption"]),
     )
