@@ -1,0 +1,60 @@
+{
+  "teamserver": {
+    "ip": "0.0.0.0",
+    "port": "8000",
+    "version": "1.0.0",
+    "server_name": "PyBit-TeamServer",
+    "auth": {
+      "enabled": true,
+      "method": "password", 
+      "password": "pybit"
+    },
+    "logging": {
+      "enabled": true,
+      "log_file": "logs/teamserver.log",
+      "log_level": "info"
+    },
+    "beacon": {
+      "max_connections": 100,
+      "timeout_seconds": 10,
+      "heartbeat_interval": 5,
+      "http_profile": {
+        "tls": {
+            "enabled": true,
+            "cert": "cert.pem",
+            "key": "key.pem"
+        },
+        "get": {
+            "uri": "/news",
+            "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept": "*/*"
+            },
+            "padding": true,
+            "jitter": 20,
+            "sleep": 5000
+        },
+        "post": {
+            "uri": "/submit.php",
+            "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Content-Type": "application/octet-stream",
+            "X-Auth": "Bearer %TOKEN%"
+            },
+            "body_encoding": "base64",
+            "padding": true,
+            "obfuscate": true
+        }
+      },
+      "proxy": {
+        "enabled": true,
+        "listen_port": 1050
+      }
+    },
+    "encryption": {
+      "enabled": true,
+      "method": "AES-GCM",
+      "key": "REPLACE_WITH_256BIT_KEY"
+    }
+  }
+}

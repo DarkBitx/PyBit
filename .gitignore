@@ -4,3 +4,4 @@ instance/
 videos/
 .env
 structure.md
+test.py
