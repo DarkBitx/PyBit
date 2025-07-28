@@ -141,7 +141,7 @@ class Print_str:
         return f"{self.style.yellow('[#]')} {msg}\n"
 
     def signal(self, msg):
-        return f"{self.style.light_white('[^]')} {msg}\n"
+        return f"{self.style.dim('[^]')} {msg}\n"
 
     def custom(self, tag, msg, color_func):
         """

@@ -25,7 +25,7 @@ class Client:
             
 def handle_client(self):
     try:
-        threading.Thread(target=routes.handle, args=(self,), daemon=True).start()
+        threading.Thread(target=routes.handle, args=(self, False), daemon=True).start()
     except Exception as e:
         print(f"[!] Error: {str(e)}")
         tcp.close(self.conn)

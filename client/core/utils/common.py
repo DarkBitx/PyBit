@@ -9,7 +9,7 @@ import os
 init(autoreset=True)
 
 def time_now_str() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.now(timezone.utc).strftime("[%H:%M:%S]")
 
 def time_now():
     return datetime.now(timezone.utc)

@@ -1,6 +1,6 @@
 from core.utils import common
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List
 
 @dataclass
 class TLSConfig:
@@ -63,6 +63,23 @@ class EncryptionConfig:
     key: str
 
 @dataclass
+class RouteConfig:
+    uri: str
+    method: List[str]
+    auth_required: bool
+
+
+@dataclass
+class HTTPListenerConfig:
+    tls: TLSConfig
+    routes: Dict[str, RouteConfig]
+
+@dataclass
+class ListenerConfig:
+    http: HTTPListenerConfig
+
+
+@dataclass
 class TeamServerConfig:
     ip: str
     port: str
@@ -71,9 +88,15 @@ class TeamServerConfig:
     auth: AuthConfig
     logging: LoggingConfig
     agent: AgentConfig
+    listener: ListenerConfig
     encryption: EncryptionConfig
-
+    
 def from_dict(data: dict) -> TeamServerConfig:
+    http_routes = {
+        name: RouteConfig(**route)
+        for name, route in data["listener"]["http"]["routes"].items()
+    }
+
     return TeamServerConfig(
         ip=data["ip"],
         port=data["port"],
@@ -93,7 +116,13 @@ def from_dict(data: dict) -> TeamServerConfig:
             ),
             proxy=ProxyConfig(**data["agent"]["proxy"]),
         ),
-        encryption=EncryptionConfig(**data["encryption"]),
+        listener=ListenerConfig(
+            http=HTTPListenerConfig(
+                tls=TLSConfig(**data["listener"]["http"]["tls"]),
+                routes=http_routes
+            )
+        ),
+        encryption=EncryptionConfig(**data["encryption"])
     )
 
 data = common.load_json_file("profile.json")

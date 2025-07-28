@@ -115,6 +115,13 @@ class TerminalWindow:
         self.lock = threading.Lock()
         self.shared_cmd = None
 
+        self.agent_id = None
+        self.agent_shell = None
+
+        self.command_history = []
+        self.history_index = -1
+
+        
         self.window = tk.Toplevel()
         self.window.title("PyBit C2 - Terminal")
         self.window.configure(bg="#000000")
@@ -136,12 +143,16 @@ class TerminalWindow:
         for tag, color in COLOR_HEX.items():
             self.text.tag_config(tag, foreground=color)
             
-        self.insert_line(f"Trying to connect to {ip}:{port}...", "yellow")
+        self.insert_line(f"[*] Connecting to {ip}:{port} ...", "light_blue")
         self.text.update()
 
+        self.text.bind("<Key>", self.on_keypress)
         self.text.bind("<Return>", self.handle_enter)
-        self.text.bind("<Key>", lambda e: self.scroll_to_end())
-
+        self.text.bind("<Control-l>", lambda e: self.clear_screen())
+        self.text.bind("<Up>", self.navigate_history_up)
+        self.text.bind("<Down>", self.navigate_history_down)
+        self.text.bind("<Button-1>", self.on_mouse_click)
+        
         self.conn = set_conn(self.ip, self.port)
         core.handle_client(self)
 
@@ -155,11 +166,29 @@ class TerminalWindow:
         self.window.geometry(f"{win_w}x{win_h}+{x}+{y}")
 
     def handle_enter(self, event=None):
-        line = self.text.get("end-2l", "end-1c").strip()
-        cmd = line.split("#", 1)[-1].strip()
+        
+        prompt = self.get_prompt_text()
+        last_line = self.text.get("insert linestart", "insert lineend")
+
+        if last_line.startswith(prompt):
+            cmd = last_line[len(prompt):].strip()
+        else:
+            cmd = last_line.strip()
+
         self.text.insert("end", "\n")
-        self.set_command(cmd)
+
+        if cmd == "":
+            self.insert_prompt()
+            self.scroll_to_end()
+        elif cmd == "clear":
+            self.clear_screen()
+        else:
+            self.set_command(cmd)
+            self.command_history.append(cmd)
+            self.history_index = len(self.command_history)
+
         return "break"
+
     
     def set_command(self, cmd):
         with self.lock:
@@ -170,8 +199,18 @@ class TerminalWindow:
         self.text.insert("end", line + "\n", tag)
         self.scroll_to_end()
 
+    def get_prompt_text(self):
+        base = f"{self.username}@{self.server_name}"
+        parts = [base]
+        if self.agent_id and self.agent_id.strip():
+            parts.append(f"[{self.agent_id}]")
+            if self.agent_shell and self.agent_shell.strip():
+                parts.append(f"[{self.agent_shell}]")
+        return "".join(parts) + "# "
+
     def insert_prompt(self):
-        self.text.insert("end", f"{self.username}@{self.server_name}# ", "32")
+        prompt = self.get_prompt_text()
+        self.text.insert("end", prompt, "32")
         self.scroll_to_end()
 
     def insert_ansi(self, text, insert_status=True):
@@ -196,14 +235,55 @@ class TerminalWindow:
     def remove_ansi_codes(self,text: str) -> str:
         ansi_escape = re.compile(r'\x1b\[\d{1,2}m')
         return ansi_escape.sub('', text)
-    
+
+
+    def navigate_history_up(self, event):
+        if self.command_history and self.history_index > 0:
+            self.history_index -= 1
+            self.replace_current_command(self.command_history[self.history_index])
+        return "break"
+
+    def navigate_history_down(self, event):
+        if self.command_history and self.history_index < len(self.command_history) - 1:
+            self.history_index += 1
+            self.replace_current_command(self.command_history[self.history_index])
+        elif self.history_index == len(self.command_history) - 1:
+            self.history_index += 1
+            self.replace_current_command("")
+        return "break"
+
+    def replace_current_command(self, new_cmd):
+        prompt = self.get_prompt_text()
+        
+        line_start = self.text.index("insert linestart")
+        line_end = self.text.index("insert lineend")
+        full_line = self.text.get(line_start, line_end)
+
+        if full_line.startswith(prompt):
+            self.text.delete(line_start + f"+{len(prompt)}c", line_end)
+            self.text.insert(line_start + f"+{len(prompt)}c", new_cmd)
+            
+    def restore_cursor(self):
+        self.text.mark_set(tk.INSERT, tk.END)
+        self.scroll_to_end()
+
+    def on_mouse_click(self, event):
+        self.text.after(1, self.restore_cursor)
+        return None
+
+    def on_keypress(self, event):
+        self.text.mark_set(tk.INSERT, tk.END)
+
     def scroll_to_end(self):
         self.text.see("end")
-        
+
+    def clear_screen(self, text=""):
+        self.text.delete("1.0", tk.END)
+        self.insert_ansi(text)
+
     def on_close(self):
         self.window.destroy()
         os._exit(0)
-
 
 def set_conn(ip,port):
     client = core.Client(ip, port)
