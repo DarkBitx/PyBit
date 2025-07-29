@@ -2,14 +2,12 @@ from core.utils import config, common
 from core.agents import handler
 from core.listener.util import LISTENERS
 
-from dataclasses import dataclass
 from flask import Flask
 from gevent.pywsgi import WSGIServer
 import threading
 import time
 
 printer = common.Print_str()
-
 
 class HTTP_Listener:
     def __init__(self, ip, port, name):
@@ -18,6 +16,7 @@ class HTTP_Listener:
         self.port = port
         self.name = name
         self.base_url = f"http://{self.ip}:{self.port}/"
+        self.auth = CONFIG.listener.http.routes["auth"]
         self.task = CONFIG.listener.http.routes["task"]
         self.result = CONFIG.listener.http.routes["result"]
         self.listener = Flask(self.name)
@@ -28,6 +27,12 @@ class HTTP_Listener:
         self.message = printer.success(f"Listener {self.name} created successfully")
         
     def setup_routes(self):
+        self.listener.add_url_rule(
+            rule=self.auth.uri,
+            endpoint='handle_auth',
+            view_func=handler.handle_auth,
+            methods=self.auth.method
+        )
         self.listener.add_url_rule(
             rule=self.task.uri,
             endpoint='handle_task',
@@ -42,6 +47,8 @@ class HTTP_Listener:
             methods=self.result.method
         )
 
+        self.listener.before_request(handler.handle_before_request)
+            
     def run(self):
         try:
             self.setup_routes()

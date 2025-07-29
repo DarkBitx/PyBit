@@ -1,9 +1,8 @@
 # Developed by DarkBit — © 2025
 # Follow for updates: https://t.me/DarkBitx
-    
-from core.utils import common, config
+
+from core.utils import common   
 from core.server import core
-from core.server.commands import status
 
 def main():
     

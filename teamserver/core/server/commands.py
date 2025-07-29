@@ -1,7 +1,9 @@
 from core.utils import common, config
-from core.agents import handler, commands
+from core.agents import handler
+from core.agents.utils import task as taskmng
 from core.listener import tcp_listener, http_listener, util
-from prettytable import PrettyTable
+
+from prettytable import PrettyTable, HRuleStyle
 
 printer = common.Print_str()
 
@@ -68,10 +70,12 @@ def list_agent():
     table.sortby = "ID"
     table.border = True
     table.header = True
+    table.hrules = HRuleStyle.ALL
+    agents = AGENTS.values()
+    if not agents:
+        return printer.warning(f"No agent found")
 
-    for agent in AGENTS.values():
-        if not agent:
-            break
+    for agent in agents:
         table.add_row([agent.id, agent.ip, agent.username, agent.hostname, agent.arch, agent.conn_type, agent.status])
         
     return str(table) + "\n"
@@ -86,22 +90,52 @@ def list_listener():
     table.sortby = "Name"
     table.border = True
     table.header = True
+    table.hrules = HRuleStyle.ALL
+    listeners = LISTENERS.values()
+    if not listeners:
+        return printer.warning(f"No listener found")
 
-    for listener in LISTENERS.values():
-        if not listener:
-            break
+    for listener in listeners:
         table.add_row([listener.name, listener.ip, listener.port, listener.conn_type, listener.status, listener.started_at])
-
-        
+    
     return str(table) + "\n"
 
-def list(arg):
+def list_tasks(agent_id=None):
+    table = PrettyTable()
+    table.align["Command"] = "l"
+    table.border = True
+    table.header = True
+    table.hrules = HRuleStyle.ALL
+
+    if agent_id:
+        table.title = f"Agent {agent_id} Tasks"
+        table.field_names = ["ID", "Command", "Status", "Created At"]
+        tasks = taskmng.get_all_tasks(agent_id)
+        rows = [[t.id, t.command, t.status, t.created_at] for t in tasks]
+    else:
+        table.title = "All Tasks"
+        table.field_names = ["ID", "Agent ID", "Command", "Status", "Created At"]
+        agents = taskmng.get_all()
+        for tasks in agents:
+            for t in tasks:
+                rows = [[t.id, t.agent_id, t.command, t.status, t.created_at] for t in tasks]
+
+    table.sortby = "ID"
+    for row in rows:
+        table.add_row(row)
+
+    return str(table) + "\n"
+
+
+def list(arg, agent_id=None):
 
     match arg:
         case "agents":
             return list_agent()
         case "listeners":
             return list_listener()
+        case "tasks":
+            return list_tasks(agent_id)
         case _:
             return list_help()
 
@@ -148,13 +182,13 @@ def help():
     help_lines = ["Available Commands:\n"]
 
     for cmd, info in MAIN_COMMANDS.items():
-        cmd = info["cmd"] if isinstance(info, dict) else info
+        cmd = info["msg"] if isinstance(info, dict) else info
         help_lines.append(f"  - {cmd:<20} {cmd}")
         
     return printer.info("\n".join(help_lines))
 
 def list_help():
-    return printer.info("Usage: list | ls <agents>|<listeners>")
+    return printer.info("Usage: list | ls <agents|listeners> | <tasks> <agent_id>")
 
 def listener_help():
     return printer.info("Usage:\ntype: tcp|http - command: close|pause|resume\nlistener | lr <type:ip:port> <name>\nlistener | lr <command:name>")

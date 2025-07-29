@@ -55,6 +55,11 @@ def handle(conn, addr, username="operator"):
                 # header = MAIN_COMMANDS.get("list")["header"]
                 response = commands.list(arg)
                 tcp.send_data(conn, response)
+
+            case ["list", arg, agent_id] | ["ls", arg, agent_id]:
+                # header = MAIN_COMMANDS.get("list")["header"]
+                response = commands.list(arg, agent_id)
+                tcp.send_data(conn, response)
                 
             case ["listener"] | ["lr"]:
                 # header = MAIN_COMMANDS.get("listener")["header"]

@@ -1,6 +1,6 @@
 from core.utils import common, config
-from core.agents import handler, commands
-from prettytable import PrettyTable
+from core.agents.utils import task as taskmng
+from prettytable import PrettyTable, HRuleStyle
 from core.transport import tcp, http
 
 printer = common.Print_str()
@@ -11,11 +11,14 @@ AGENT_COMMANDS = {
         "msg": "Show detailed system info of agent",
         "header": "SYSTEM INFO"
     },
-    "exit": {
-        "msg": "Terminate the agent session",
-        "header": "EXIT"
+    "tasks": {
+        "msg": "Show all tasks of agent",
+        "header": "TASKS"
     },
-
+    "result": {
+        "msg": "Show result of task ",
+        "header": "TASKS"
+    },
     # === Command Execution ===
     "cmd": {
         "msg": "Execute command on agent",
@@ -92,9 +95,73 @@ AGENT_COMMANDS = {
     }
 }
 
+def tasks(agent_id):
+    table = PrettyTable()
+    table.title = f"Agent {agent_id} tasks"
+    table.field_names = ["ID","Command", "Status", "Created At"]
+    table.align["Command"] = "l"  
+    table.sortby = "ID"
+    table.border = True
+    table.header = True
+    table.hrules = HRuleStyle.ALL
+        
+    tasks = taskmng.get_all_tasks(agent_id)
+    for task in tasks:
+        table.add_row([task.id, task.command, task.status, task.created_at])
+    
+    return str(table) + "\n"
 
-def exit():
-    return printer.signal("Main Menu")
+def result(agent_id, arg=None):
+    table = PrettyTable()
+    table.border = True
+    table.header = True
+    table.hrules = HRuleStyle.ALL
+    table.align["Command"] = "l"
+    table.align["Result"] = "l"
+
+    if arg:
+        if arg == "all":
+            table.title = f"All Results for Agent {agent_id}"
+            table.field_names = ["ID", "Command", "Result"]
+            tasks = taskmng.get_all_tasks(agent_id)
+            if not tasks:
+                return printer.warning(f"No tasks found for agent {agent_id}")
+            for task in tasks:
+                table.add_row([task.id, task.command, task.result])
+        else:
+            task = taskmng.get_task_by_id(agent_id, arg)
+            if not task:
+                return printer.warning(f"Task {arg} not found for agent {agent_id}")
+            table.field_names = ["Command", "Result"]
+            table.add_row([task.command, task.result])
+
+    else:
+        task = taskmng.get_earliest_result(agent_id)
+        if not task:
+            return printer.warning("No result has been sent yet")
+        table.title = "Latest done task"
+        table.field_names = ["ID", "Command", "Result"]
+        table.add_row([task.id, task.command, task.result])
+
+    return str(table) + "\n"
+
+
+def tasks(agent_id):
+    table = PrettyTable()
+    table.title = f"Agent {agent_id} tasks"
+    table.field_names = ["ID","Command", "Status", "Created At"]
+    table.align["Command"] = "l"  
+    table.sortby = "ID"
+    table.border = True
+    table.header = True
+    table.hrules = HRuleStyle.ALL
+        
+    tasks = taskmng.get_all_tasks(agent_id)
+    for task in tasks:
+        table.add_row([task.id, task.command, task.status, task.created_at])
+        
+    
+    return str(table) + "\n"
 
 def cmd(agent, cmd, conn_type):
     header = AGENT_COMMANDS.get("cmd")["header"]
@@ -102,7 +169,7 @@ def cmd(agent, cmd, conn_type):
         tcp.send_data(agent.conn, cmd, header)
         _, response = tcp.recv_data(agent.conn)
     elif conn_type == "http":
-        task_id = handler.add_task(agent.id, cmd)
+        task_id = taskmng.add_task(agent.id, cmd)
         response = printer.success(f"Task {task_id} added")
     return response
 
@@ -123,7 +190,10 @@ def shell(conn, agent):
         _, response = tcp.recv_data(agent.conn)
         tcp.send_data(conn, response)
         
-    return f"{printer.info("Closing shell...")}{printer.success(response)}"
+    return f"{printer.task("Closing shell...")}{printer.success(response)}"
+
+def exit():
+    return printer.signal("Main Menu")
 
 # Helps
 
