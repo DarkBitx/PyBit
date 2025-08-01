@@ -40,39 +40,41 @@ class HTTPRequest:
         return self.remote_addr
 
     def send(self):
-        sep = self.header_separator
-        task_id = self.task_id
-        data = self.data
-        header = self.header
-        status = self.status
         
-        parts = []
+        parts = ["", "", ""]
 
-        if header:
-            parts.append(header)
+        if self.header:
+            parts[0] = self.header
+        if self.task_id:
+            parts[1] = self.task_id
+        if self.data:
+            parts[2] = self.data
+            
+        payload = self.header_separator.join(parts)
 
-        if task_id:
-            parts.append(task_id)
-
-        parts.append(data)
-
-        payload = sep.join(parts)
-
-        response = Response(payload, status)
+        response = Response(payload, self.status)
         response.headers["Content-Type"] = "application/octet-stream"
         response.headers["Content-Length"] = str(len(payload.encode()))
         return response
 
     def recv(self, binary=False):
-        parts = self.data.split(self.header_separator.encode(), 2)
+        
+        if isinstance(self.data, str):
+            raw_data = self.data.encode()
+        else:
+            raw_data = self.data
+
+        parts = raw_data.split(self.header_separator.encode(), 2)
+        
+        header = b""
+        task_id = b""
+        data = b""
+        
         if len(parts) == 3:
-            header, task_id, data = parts
+            header,task_id, data = parts
         elif len(parts) == 2:
             task_id, data = parts
-            header = ""
         else:
-            header = ""
-            task_id = ""
             data = parts[0]
 
         self.header = header if binary else header.decode(errors="ignore")

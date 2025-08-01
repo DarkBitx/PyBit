@@ -5,3 +5,4 @@ videos/
 .env
 structure.md
 test.py
+server.log

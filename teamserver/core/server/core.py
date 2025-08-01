@@ -1,4 +1,5 @@
 from core.utils.config import CONFIG
+from core.utils import log
 from core.server import handler
 from core.transport  import tcp
 import threading
@@ -8,7 +9,6 @@ class Server:
     def __init__(self):
         self.ip = CONFIG.ip
         self.port = CONFIG.port
-
         
     def run(self):
         with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as server:
@@ -17,13 +17,14 @@ class Server:
             
             while True:
                 conn,addr = server.accept()
-                print(f"new connection [{addr}]")
+                log.info(f"New client connected from {addr[0]}:{addr[1]}")
                 threading.Thread(target=handle_client, args=(conn,addr), daemon=True).start()
 
 def handle_client(conn,addr):
     try:
         handler.handle(conn,addr)
     except Exception as e:
+        log.error(str(e))
         tcp.send_data(conn, f"[!] Error: {str(e)}")
     finally:
         tcp.close(conn)

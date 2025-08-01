@@ -2,7 +2,6 @@ from core.client import routes
 from core.transport  import tcp
 import threading
 import socket
-import time
 
 class Client:
     def __init__(self, ip, port):

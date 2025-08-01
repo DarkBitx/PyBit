@@ -151,7 +151,6 @@ class TerminalWindow:
         self.text.bind("<Control-l>", lambda e: self.clear_screen())
         self.text.bind("<Up>", self.navigate_history_up)
         self.text.bind("<Down>", self.navigate_history_down)
-        self.text.bind("<Button-1>", self.on_mouse_click)
         
         self.conn = set_conn(self.ip, self.port)
         core.handle_client(self)
@@ -267,10 +266,6 @@ class TerminalWindow:
         self.text.mark_set(tk.INSERT, tk.END)
         self.scroll_to_end()
 
-    def on_mouse_click(self, event):
-        self.text.after(1, self.restore_cursor)
-        return None
-
     def on_keypress(self, event):
         self.text.mark_set(tk.INSERT, tk.END)
 
@@ -300,3 +295,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = LoginWindow(root)
     root.mainloop()
+    

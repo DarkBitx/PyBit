@@ -1,4 +1,4 @@
-from core.utils import config, common
+from core.utils import config, common, log
 from core.agents import handler
 from core.listener.util import LISTENERS
 
@@ -25,6 +25,7 @@ class HTTP_Listener:
         self.status = "active"
         self.started_at = common.time_now_str()
         self.message = printer.success(f"Listener {self.name} created successfully")
+        self.logger = log.get_logger(self.name,True)
         
     def setup_routes(self):
         self.listener.add_url_rule(
@@ -53,7 +54,8 @@ class HTTP_Listener:
         try:
             self.setup_routes()
             LISTENERS[self.name] = self
-            self.server = WSGIServer((self.ip, int(self.port)), self.listener)
+            self.server = WSGIServer((self.ip, int(self.port)), self.listener, log=self.logger)
+            log.info(f"Listener running at {self.base_url}")
             self.server.serve_forever()
 
         except OSError or PermissionError or WindowsError:

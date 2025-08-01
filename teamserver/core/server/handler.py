@@ -1,6 +1,6 @@
 from core.utils.config import CONFIG
 from core.server import commands
-from core.utils import common
+from core.utils import common, log
 from core.transport import tcp
 from functools import wraps
 
@@ -17,8 +17,11 @@ def auth(func):
 
         if password == CONFIG.auth.password:
             tcp.send_data(conn, "TRUE")
+            
+            log.info(f"Client {username} authenticated")
             return func(conn, addr, username, *args, **kwargs)
         else:
+            log.warning(f"Client {username} could not authenticate")
             tcp.send_data(conn, "FALSE")
 
     return wrapper

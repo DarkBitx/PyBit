@@ -15,14 +15,16 @@ class Task:
     id: str
     agent_id: str
     command: str
+    header: str
     status: str = TASK_STATUS_PENDING
     result: Optional[str] = None
+    result_at: str = None 
     created_at: str = common.time_now_str()
 
 
-def add_task(agent_id: str, command: str) -> int:
+def add_task(agent_id: str, command: str, header :str ="") -> int:
     global _task_counter
-    task = Task(id=str(_task_counter), agent_id=agent_id, command=command)
+    task = Task(id=str(_task_counter), agent_id=agent_id, command=command, header=header)
     _task_counter += 1
     TASKS.setdefault(agent_id, []).append(task)
     return task.id
@@ -58,7 +60,7 @@ def get_earliest_result(agent_id: str) -> Optional[Task]:
     done_tasks = [task for task in tasks if task.status == TASK_STATUS_DONE]
     if not done_tasks:
         return None
-    return min(done_tasks, key=lambda task: task.created_at)
+    return max(done_tasks, key=lambda task: task.id)
 
 
 def mark_task_done(agent_id: str, task_id: int, result: Optional[str] = None) -> bool:
@@ -66,6 +68,7 @@ def mark_task_done(agent_id: str, task_id: int, result: Optional[str] = None) ->
     if task:
         task.status = TASK_STATUS_DONE
         task.result = result
+        task.result_at = common.time_now_str()
         return True
     return False
 

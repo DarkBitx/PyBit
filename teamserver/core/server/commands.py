@@ -3,7 +3,7 @@ from core.agents import handler
 from core.agents.utils import task as taskmng
 from core.listener import tcp_listener, http_listener, util
 
-from prettytable import PrettyTable, HRuleStyle
+from tabulate import tabulate
 
 printer = common.Print_str()
 
@@ -41,14 +41,10 @@ MAIN_COMMANDS = {
 def status():
     CONFIG = config.CONFIG
     AGENTS = handler.AGENTS
-    style = common.TextStyle()
-    
-    table = PrettyTable()
 
-    table.title = "Teamserver"
-    table.field_names = ["Config",  "Value"]
-    table.align["Config"] = "l"  
-    table.add_rows([
+    title = "Teamserver"
+    headers = ["Config",  "Value"]
+    rows = [
         ["Server Name", CONFIG.server_name],
         ["Version", CONFIG.version],
         ["IP",CONFIG.ip],
@@ -58,73 +54,65 @@ def status():
         ["Agents", len(AGENTS)],
         ["Active ", sum(1 for a in AGENTS.values() if a.status == "active")],
         ["Dead Agents", sum(1 for a in AGENTS.values() if a.status != "active")]
-    ])
-    return str(table) + "\n"
+    ]
+    output = f"{title}\n{tabulate(rows, headers=headers, tablefmt='fancy_grid')}\n"
+    return output
 
 def list_agent():
     AGENTS = handler.AGENTS
-    table = PrettyTable()
-    table.title = "Agents"
-    table.field_names = ["ID", "IP Address", "Username", "Hostname", "OS", "Connection Type", "Status"]
-    table.align["Username"] = "l"  
-    table.sortby = "ID"
-    table.border = True
-    table.header = True
-    table.hrules = HRuleStyle.ALL
+    title = "Agents"
+    headers = ["ID", "IP Address", "Username", "Hostname", "OS", "Connection Type", "Status"]
+    rows = []
+    
     agents = AGENTS.values()
     if not agents:
         return printer.warning(f"No agent found")
 
     for agent in agents:
-        table.add_row([agent.id, agent.ip, agent.username, agent.hostname, agent.arch, agent.conn_type, agent.status])
-        
-    return str(table) + "\n"
+        rows.append([agent.id, agent.ip, agent.username, agent.hostname, agent.arch, agent.conn_type, agent.status])
+
+    output = f"{title}\n{tabulate(rows, headers=headers, tablefmt='fancy_grid')}\n"
+    return output
     
 
 def list_listener():
     LISTENERS = util.LISTENERS
-    table = PrettyTable()
-    table.title = "Listeners"
-    table.field_names = ["Name", "Host", "Port","Connection Type", "Status", "Started At"]
-    table.align["Name"] = "l"  
-    table.sortby = "Name"
-    table.border = True
-    table.header = True
-    table.hrules = HRuleStyle.ALL
+    title = "Listeners"
+    headers = ["Name", "Host", "Port","Connection Type", "Status", "Started At"]
+    rows = []
+
     listeners = LISTENERS.values()
     if not listeners:
         return printer.warning(f"No listener found")
 
     for listener in listeners:
-        table.add_row([listener.name, listener.ip, listener.port, listener.conn_type, listener.status, listener.started_at])
-    
-    return str(table) + "\n"
+        rows.append([listener.name, listener.ip, listener.port, listener.conn_type, listener.status, listener.started_at])
+
+    output = f"{title}\n{tabulate(rows, headers=headers, tablefmt='fancy_grid')}\n"
+    return output
 
 def list_tasks(agent_id=None):
-    table = PrettyTable()
-    table.align["Command"] = "l"
-    table.border = True
-    table.header = True
-    table.hrules = HRuleStyle.ALL
-
+    
     if agent_id:
-        table.title = f"Agent {agent_id} Tasks"
-        table.field_names = ["ID", "Command", "Status", "Created At"]
+        title = f"Agent {agent_id} Tasks"
+        headers = ["ID", "Command", "Status", "Created At"]
+        rows = []
+        
         tasks = taskmng.get_all_tasks(agent_id)
-        rows = [[t.id, t.command, t.status, t.created_at] for t in tasks]
+        for t in tasks:
+            rows.append([t.id, t.command, t.status, t.created_at])
     else:
-        table.title = "All Tasks"
-        table.field_names = ["ID", "Agent ID", "Command", "Status", "Created At"]
+        title = "All Tasks"
+        headers = ["ID", "Agent ID", "Command", "Status", "Created At"]
+        rows = []
+        
         agents = taskmng.get_all()
         for tasks in agents:
             for t in tasks:
-                rows = [[t.id, t.agent_id, t.command, t.status, t.created_at] for t in tasks]
+                rows.append([t.id, t.agent_id, t.command, t.status, t.created_at])
 
-    table.sortby = "ID"
-    for row in rows:
-        table.add_row(row)
-
-    return str(table) + "\n"
+    output = f"{title}\n{tabulate(rows, headers=headers, tablefmt='fancy_grid')}\n"
+    return output
 
 
 def list(arg, agent_id=None):

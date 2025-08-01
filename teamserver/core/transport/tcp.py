@@ -33,9 +33,9 @@ class Request:
         header = self.header
         data = self.data
         
-        payload = sep + data
+        payload = data
         if header:
-            payload = sep + header + payload
+            payload = header + sep + payload
         length = f"{len(payload):<10}".encode()
         self.conn.sendall(length + payload)
 
@@ -54,15 +54,13 @@ class Request:
         if not body:
             return False
 
-        parts = body.split(self.header_separator, 2)
+        parts = body.split(self.header_separator, 1)
 
-        if len(parts) == 3:
-            _, header, data = parts
-        elif len(parts) == 2:
-            _, data = parts
-            header = b''
-        else:
-            header = b''
+        header = b''
+        
+        if len(parts) == 2:
+            header, data = parts
+        elif len(parts) == 1:
             data = parts[0]
 
         self.header = header if binary else header.decode(errors="ignore")

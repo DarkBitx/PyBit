@@ -42,10 +42,11 @@ def new_id() -> str:
 
 
 def time_now_str() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d\n%H:%M:%S")
 
 def time_now():
     return datetime.now(timezone.utc)
+
     
 def writer(text, end='\n', flush=True):
 
