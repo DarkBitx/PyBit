@@ -63,10 +63,11 @@ def get_earliest_result(agent_id: str) -> Optional[Task]:
     return max(done_tasks, key=lambda task: task.id)
 
 
-def mark_task_done(agent_id: str, task_id: int, result: Optional[str] = None) -> bool:
+def mark_task_done(agent_id: str, task_id: int, header: str = "", result: Optional[str] = None) -> bool:
     task = get_task_by_id(agent_id, task_id)
     if task:
         task.status = TASK_STATUS_DONE
+        task.header = header
         task.result = result
         task.result_at = common.time_now_str()
         return True

@@ -3,8 +3,12 @@ from colorama import init, Fore, Style
 from random import random, uniform
 from time import sleep
 from sys import stdout
+import importlib.util
+import zipfile
 import random
 import json
+import ast
+import sys
 import os
 
 init(autoreset=True)
@@ -40,9 +44,12 @@ def new_id() -> str:
     ]
     return f"{id_parts[0]}-{id_parts[1]}"
 
-
 def time_now_str() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d\n%H:%M:%S")
+
+
+def time_now_str_only_lines() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d-%H-%M-%S")
 
 def time_now():
     return datetime.now(timezone.utc)
@@ -182,22 +189,22 @@ class Write:
         writer(f"{color_func(f'[{tag}]')} {msg}")
 
 
-def save_file(content, save_path: str, binary: bool = False) -> bool:
+def save_file(content, file_path: str, binary: bool = False) -> bool:
     try:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         mode = "wb" if binary else "w"
-        with open(save_path, mode) as f:
+        with open(file_path, mode) as f:
             f.write(content)
         return True
     except Exception as e:
         print("❌ File save error:", e)
         return False
 
-def save_json_file(data: dict, save_path: str, indent: int = 2) -> bool:
+def save_json_file(data: dict, file_path: str, indent: int = 2) -> bool:
 
     try:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        with open(save_path, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=indent)
         return True
     except Exception as e:
@@ -214,4 +221,3 @@ def load_json_file(path: str) -> dict:
     except Exception as e:
         print("❌ JSON load error:", e)
         return {}
-

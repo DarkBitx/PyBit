@@ -1,9 +1,9 @@
 class Request:
     def __init__(self):
         self.conn = None
-        self.header_separator = b'||'
-        self.header = b''
-        self.data = b''
+        self.header_separator = b"||"
+        self.header = b""
+        self.data = b""
 
     def set_conn(self, conn):
         self.conn = conn
@@ -14,8 +14,8 @@ class Request:
     def set_header(self, header):
         self.header = header if isinstance(header, bytes) else header.encode()
 
-    def set_data(self, data, binary=False):
-        self.data = data if binary else data.encode()
+    def set_data(self, data):
+        self.data = data if isinstance(data, bytes) else data.encode()
 
     def get_header_separator(self):
         return self.header_separator
@@ -33,10 +33,10 @@ class Request:
         
         payload = data
         if header:
-            payload = header + payload
+            payload = header + sep + payload
         length = f"{len(payload):<10}".encode()
         self.conn.sendall(length + payload)
-
+        
     def recv(self, binary=False):
         raw_length = self._recv_n_bytes(10)
         if not raw_length:
@@ -54,7 +54,7 @@ class Request:
 
         parts = body.split(self.header_separator, 1)
 
-        header = b''
+        header = b""
         
         if len(parts) == 2:
             header, data = parts
@@ -66,7 +66,7 @@ class Request:
         return True
 
     def _recv_n_bytes(self, n):
-        buffer = b''
+        buffer = b""
         while len(buffer) < n:
             chunk = self.conn.recv(n - len(buffer))
             if not chunk:
@@ -77,7 +77,7 @@ class Request:
     def close(self):
         self.conn.close()
         
-def send_data(conn, data, header=None, header_separator=None,  binary=False):
+def send_data(conn, data, header=None, header_separator=None):
     try:
         req = Request()
         req.set_conn(conn)
@@ -85,7 +85,7 @@ def send_data(conn, data, header=None, header_separator=None,  binary=False):
             req.set_header_separator(header_separator)
         if header:
             req.set_header(header)
-        req.set_data(data,binary)
+        req.set_data(data)
         req.send()
     except Exception as e:
         print(f"[!] Error: {str(e)}")

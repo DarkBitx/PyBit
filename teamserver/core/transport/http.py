@@ -6,12 +6,12 @@ class HTTPRequest:
         self.method = None
         self.uri = None
         self.headers = {}
-        self.data = ""
-        self.remote_addr = ""
-        self.header_separator = CONFIG.agent.seperator
-        self.header = ""
-        self.data = ""
-        self.task_id = ""
+        self.data = b""
+        self.remote_addr = b""
+        self.header_separator = CONFIG.agent.seperator.encode()
+        self.header = b""
+        self.data = b""
+        self.task_id = b""
         self.status = 200
         
 
@@ -21,17 +21,17 @@ class HTTPRequest:
         self.data = req.data
         self.remote_addr = req.remote_addr
 
-    def set_task_id(self, task_id, binary=False):
-        self.task_id = task_id if binary else task_id.decode() if isinstance(task_id, bytes) else task_id
+    def set_task_id(self, task_id):
+        self.task_id = task_id if isinstance(task_id, bytes) else task_id.encode()
         
-    def set_data(self, data, binary=False):
-        self.data = data if binary else data.decode() if isinstance(data, bytes) else data
+    def set_data(self, data):
+        self.data = data if isinstance(data, bytes) else data.encode()
 
     def set_header_separator(self, separator):
-        self.header_separator = separator if isinstance(separator, str) else separator.decode()
+        self.header_separator = separator if isinstance(separator, bytes) else separator.encode()
         
     def set_header(self, header):
-        self.header = header if isinstance(header, str) else header.decode()
+        self.header = header if isinstance(header, bytes) else header.encode()
 
     def set_status(self, status):
         self.status = status if isinstance(status, int) else int(status)
@@ -41,7 +41,7 @@ class HTTPRequest:
 
     def send(self):
         
-        parts = ["", "", ""]
+        parts = [b"", b"", b""]
 
         if self.header:
             parts[0] = self.header
@@ -54,7 +54,7 @@ class HTTPRequest:
 
         response = Response(payload, self.status)
         response.headers["Content-Type"] = "application/octet-stream"
-        response.headers["Content-Length"] = str(len(payload.encode()))
+        response.headers["Content-Length"] = str(len(payload))
         return response
 
     def recv(self, binary=False):
@@ -64,7 +64,7 @@ class HTTPRequest:
         else:
             raw_data = self.data
 
-        parts = raw_data.split(self.header_separator.encode(), 2)
+        parts = raw_data.split(self.header_separator, 2)
         
         header = b""
         task_id = b""
@@ -82,7 +82,7 @@ class HTTPRequest:
         self.data = data if binary else data.decode(errors="ignore")
         return True
 
-def generate_response(task_id=None, data=None, header=None, status=None, header_separator=None, binary=False):
+def generate_response(task_id=None, data=None, header=None, status=None, header_separator=None):
     try:
         r = HTTPRequest()
         if task_id:
@@ -94,7 +94,7 @@ def generate_response(task_id=None, data=None, header=None, status=None, header_
         if status:
             r.set_status(status)
         if data:
-            r.set_data(data, binary)
+            r.set_data(data)
         return r.send()
     except Exception as e:
         print(f"[!] Error: {str(e)}")

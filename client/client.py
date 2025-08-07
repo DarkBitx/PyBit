@@ -290,7 +290,6 @@ def set_conn(ip,port):
     return client.get_socket()
 
 
-
 if __name__ == "__main__":
     root = tk.Tk()
     app = LoginWindow(root)
