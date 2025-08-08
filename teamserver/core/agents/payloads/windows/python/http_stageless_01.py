@@ -331,7 +331,7 @@ def upload(data):
 
     file_path = f"{os.getcwd()}\\{name}"
         
-    return None, f"File saved at {file_path}"
+    return b"UPLOAD_FILE_OK", f"File saved at {file_path}".encode()
 
 def download(data):
     parts = data.split(b"::::")

