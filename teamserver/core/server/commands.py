@@ -9,31 +9,31 @@ printer = common.Print_str()
 
 MAIN_COMMANDS = {
     "status": {
-        "cmd": "Show server status",
+        "msg": "Show server status",
         "header": "STATUS"
     },
     "list": {
-        "cmd": "List agents or listeners",
+        "msg": "List agents or listeners",
         "header": "LIST"
     },
     "listener": {
-        "cmd": "Create listener",
+        "msg": "Create listener",
         "header": "LISTENER"
     },
     "interact": {
-        "cmd": "Interact with an agent",
+        "msg": "Interact with an agent",
         "header": "INTERACT"
     },
     "clear": {
-        "cmd": "Clear the screen",
+        "msg": "Clear the screen",
         "header": "CLEAR"
     },
     "exit": {
-        "cmd": "Exit the session",
+        "msg": "Exit the session",
         "header": "EXIT"
     },
     "help": {
-        "cmd": "Show this help message",
+        "msg": "Show this help message",
         "header": "HELP"
     }
 }

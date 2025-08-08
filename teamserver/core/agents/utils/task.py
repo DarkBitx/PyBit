@@ -16,15 +16,16 @@ class Task:
     agent_id: str
     command: str
     header: str
+    data: bytes
     status: str = TASK_STATUS_PENDING
     result: Optional[str] = None
     result_at: str = None 
     created_at: str = common.time_now_str()
 
 
-def add_task(agent_id: str, command: str, header :str ="") -> int:
+def add_task(agent_id: str, command: str, header :str ="", data :bytes = b"") -> int:
     global _task_counter
-    task = Task(id=str(_task_counter), agent_id=agent_id, command=command, header=header)
+    task = Task(id=str(_task_counter), agent_id=agent_id, command=command, header=header, data=data)
     _task_counter += 1
     TASKS.setdefault(agent_id, []).append(task)
     return task.id

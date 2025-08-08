@@ -43,7 +43,7 @@
     "agent": {
       "max_connections": 100,
       "timeout_seconds": 30,
-      "seperator": "||",
+      "seperator": ":|::|:",
       "heartbeat_interval": 5,
       "http_profile": {
         "tls": {

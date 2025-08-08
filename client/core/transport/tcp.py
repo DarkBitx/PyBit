@@ -1,7 +1,7 @@
 class Request:
     def __init__(self):
         self.conn = None
-        self.header_separator = b"||"
+        self.header_separator = b":|::|:"
         self.header = b""
         self.data = b""
 

